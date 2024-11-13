@@ -1,0 +1,183 @@
+{
+  //    ----  MySQL Config    ----
+    "mysql": {
+        "host": "localhost",
+        "port": 3306,
+        "user": "root",
+        "password": "pass",
+        "database": "ForexFactory",
+        "table": "MarketBDSwiss"
+    },
+
+  "data_folder": "/var/www/",
+
+  //    ----  DOWNLOAD AND MERGE DATA    ----
+  "inception_date": "2000-01-04",
+  "symbols": [
+    {
+      "symbol": "EURUSD",
+      "data_sources": [
+          {
+            "folder": "EURUSD",
+            "file": "klines",
+            "column_prefix": "EURUSD_"
+          }
+      ]
+    },
+    {
+      "symbol": "GBPUSD",
+      "data_sources": [
+          {
+            "folder": "GBPUSD",
+            "file": "klines",
+            "column_prefix": "GBPUSD_"
+          }
+      ]
+    },
+    {
+      "symbol": "EURGBP",
+      "data_sources": [
+          {
+            "folder": "EURGBP",
+            "file": "klines",
+            "column_prefix": "EURGBP_"
+          }
+      ]
+    },
+    {
+      "symbol": "USDJPY",
+      "data_sources": [
+          {
+            "folder": "USDJPY",
+            "file": "klines",
+            "column_prefix": "USDJPY_"
+          }
+      ]
+    },
+    {
+      "symbol": "EURJPY",
+      "data_sources": [
+          {
+            "folder": "EURJPY",
+            "file": "klines",
+            "column_prefix": "EURJPY_"
+          }
+      ]
+    }
+  ],
+
+  //    ----  Feature Stuff    ----
+
+  "feature_sets": [
+    {
+      "column_prefix": "",
+      "generator": "talib",
+      "feature_prefix": "",
+      "config": {
+        "columns": ["close"],
+        "functions": ["LINEARREG_SLOPE"],
+        "windows": [5, 10, 15, 60]
+      }
+    },
+    {
+      "column_prefix": "",
+      "generator": "talib",
+      "feature_prefix": "",
+      "config": {
+        "columns": ["close"],
+        "functions": ["STDDEV"],
+        "windows": [5, 10, 15, 60]
+      }
+    }
+  ],
+
+  //    ----  LABEL GENERATION    ----
+
+  "label_sets": [
+    {
+      "column_prefix": "",
+      "generator": "highlow2",
+      "feature_prefix": "",
+      "config": {
+        "columns": ["close", "high", "low"],
+        "function": "high",
+        "thresholds": [2.0],
+        "tolerance": 0.2,
+        "horizon": 60,
+        "names": ["high_20"]
+      }
+    },
+    {
+      "column_prefix": "",
+      "generator": "highlow2",
+      "feature_prefix": "",
+      "config": {
+        "columns": ["close", "high", "low"],
+        "function": "low",
+        "thresholds": [2.0],
+        "tolerance": 0.2,
+        "horizon": 60,
+        "names": ["low_20"]
+      }
+    }
+  ],
+
+  //    ----  TRAINING CONFIGURATION    ----
+  "labels": ["high_20", "low_20"],
+  "training_directoy": "/var/www/PyTSLib",
+  "algorithms": [
+    'PatchTST_FxM5.sh', 'TimeMixer_Fx_M5.sh', 'TimesNet_FxM5.sh'
+  ],
+
+  "features_horizon": 100, // Minimum data length for feature computation (online mode)
+
+  //    ----  SCORE AGGREGATION AND POST-PROCESSING    ----
+  "score_aggregation_sets": [
+    {
+      "column": "trade_score", // Output column: positive values for buy, negative for sell
+      "buy_labels": ["high_20_lc"],
+      "sell_labels": ["low_20_lc"],
+      "parameters": {
+        "point_threshold": null, // Optional: threshold to produce boolean column
+        "window": 3, // Aggregation window size
+        "combine": "difference", // Options: "no_combine", "relative", "difference"
+        "coefficient": 1.0,
+        "constant": 0.0
+      }
+    }
+  ],
+
+  //    ----  SIGNAL RULES FOR TRADING    ----
+
+  "signal_model": {
+    "rule_name": "",
+    "signal_columns": ["buy_signal_column", "sell_signal_column"],
+    "parameters": {
+      "buy_signal_threshold": 0.05,
+      "sell_signal_threshold": -0.05
+    },
+    "notification": {}
+  },
+
+  "train_signal_model": {
+    "data_start": 0,
+    "data_end": null,
+    "buy_sell_equal": false,
+    "direction": "long",
+    "topn_to_store": 10,
+    "grid": {
+      "buy_signal_threshold": [0.02, 0.03, 0.04, 0.05, 0.1, 0.15],
+      "sell_signal_threshold": [-0.02, -0.03, -0.04, -0.05, -0.1, -0.15]
+    }
+  },
+
+  "rolling_predict": {
+    "data_start": "2020-02-01 00:00:00",
+    "data_end": null,
+    "prediction_start": null,
+    "prediction_size": 10080, 7*1440
+    "prediction_steps": 4, // Number of train-predict steps
+    "use_multiprocessing": false,
+    "max_workers": 8
+  }
+}
